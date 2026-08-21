@@ -41,15 +41,25 @@ async function applyPaidOrder(order: {
   return data;
 }
 
-export const POST = Webhooks({
-  webhookSecret: process.env.POLAR_WEBHOOK_SECRET ?? "missing",
-  onOrderPaid: async (payload) => {
-    const order = payload.data as {
-      id: string;
-      paid: boolean;
-      checkoutId: string | null;
-      subtotalAmount: number;
+const polarWebhookSecret = process.env.POLAR_WEBHOOK_SECRET;
+
+export const POST = polarWebhookSecret
+  ? Webhooks({
+      webhookSecret: polarWebhookSecret,
+      onOrderPaid: async (payload) => {
+        const order = payload.data as {
+          id: string;
+          paid: boolean;
+          checkoutId: string | null;
+          subtotalAmount: number;
+        };
+        await applyPaidOrder(order);
+      },
+    })
+  : async () => {
+      console.error("POLAR_WEBHOOK_SECRET is not configured.");
+      return Response.json(
+        { error: "POLAR_WEBHOOK_SECRET is not configured." },
+        { status: 500 },
+      );
     };
-    await applyPaidOrder(order);
-  },
-});
