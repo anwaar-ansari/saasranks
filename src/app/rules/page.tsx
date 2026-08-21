@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { getBoard } from "@/lib/board";
-import { MIN_BID_DOLLARS, STEP_DOLLARS, TOP_PREMIUM_DOLLARS } from "@/lib/money";
+import { MIN_BID_DOLLARS, STEP_DOLLARS } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +40,8 @@ export default async function RulesPage() {
             checkout, you pay only the difference from your current bid.
           </li>
           <li>
-            Taking #1 costs at least ${TOP_PREMIUM_DOLLARS} more than the current
-            top bid. Other ranks move ${STEP_DOLLARS} at a time.
+            Taking #1 requires at least ${STEP_DOLLARS} more than the current top
+            bid. Equal bids keep the older listing higher.
           </li>
           <li>A checkout does not reserve a rank. The board can move before payment is confirmed.</li>
         </ul>

@@ -1,6 +1,7 @@
 import { DEMO_LISTINGS } from "./demo-data";
 import { rankListings } from "./rank";
-import { hasSupabase, supabaseAdmin } from "./supabase";
+import { allowDemoBoard, hasSupabaseAdmin } from "./supabase/env";
+import { createSupabaseAdmin } from "./supabase/admin";
 import type {
   ActivityEvent,
   Listing,
@@ -9,25 +10,41 @@ import type {
   TrendingItem,
 } from "./types";
 
-const DEMO_BID_MINUTES = [8, 33, 46, 60, 95, 140, 200, 360];
+type ListingRow = {
+  id: string;
+  normalized_url: string;
+  display_url: string;
+  hostname: string;
+  name: string;
+  pitch: string;
+  logo_url: string | null;
+  current_bid_cents: number;
+  click_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export function mapListing(row: ListingRow): Listing {
+  return {
+    id: row.id,
+    listing_key: row.normalized_url,
+    url: row.display_url,
+    name: row.name,
+    tagline: row.pitch,
+    category: "other",
+    logo_url: row.logo_url,
+    bid_cents: row.current_bid_cents,
+    clicks: row.click_count,
+    created_at: row.created_at,
+    last_bid_at: row.updated_at,
+  };
+}
 
 export function withRanks(listings: Listing[]): RankedListing[] {
   return rankListings(listings).map((listing, index) => ({
     ...listing,
     rank: index + 1,
   }));
-}
-
-function demoListings(): RankedListing[] {
-  const now = Date.now();
-  return withRanks(
-    DEMO_LISTINGS.map((listing, index) => ({
-      ...listing,
-      last_bid_at: new Date(
-        now - (DEMO_BID_MINUTES[index] ?? 400) * 60_000,
-      ).toISOString(),
-    })),
-  );
 }
 
 export function activityFromListings(listings: RankedListing[]): ActivityEvent[] {
@@ -55,16 +72,35 @@ export function activityFromListings(listings: RankedListing[]): ActivityEvent[]
 function trendingFromClicks(
   listings: RankedListing[],
   hourly: Map<string, number>,
+  estimateWhenEmpty: boolean,
 ): TrendingItem[] {
   return listings
-    .map((listing) => ({
-      listing,
-      clicksPerHour:
-        hourly.get(listing.id) ?? Math.max(1, Math.round(listing.clicks / 5)),
-    }))
-    .sort((a, b) => b.clicksPerHour - a.clicksPerHour)
+    .map((listing) => {
+      const counted = hourly.get(listing.id);
+      const clicksPerHour =
+        counted ??
+        (estimateWhenEmpty ? Math.max(0, Math.round(listing.clicks / 5)) : 0);
+      return { listing, clicksPerHour };
+    })
+    .sort((a, b) => {
+      if (b.clicksPerHour !== a.clicksPerHour) {
+        return b.clicksPerHour - a.clicksPerHour;
+      }
+      return b.listing.clicks - a.listing.clicks;
+    })
     .slice(0, 5);
 }
+
+const emptyBoard = {
+  listings: [] as RankedListing[],
+  stats: {
+    visitors: 0,
+    launched_at: new Date().toISOString(),
+  },
+  live: false,
+  activity: [] as ActivityEvent[],
+  trending: [] as TrendingItem[],
+};
 
 export async function getBoard(): Promise<{
   listings: RankedListing[];
@@ -73,31 +109,35 @@ export async function getBoard(): Promise<{
   activity: ActivityEvent[];
   trending: TrendingItem[];
 }> {
-  if (!hasSupabase()) {
-    const listings = demoListings();
-    return {
-      listings,
-      stats: {
-        visitors: 18420,
-        launched_at: "2026-08-01T00:00:00.000Z",
-      },
-      live: false,
-      activity: activityFromListings(listings),
-      trending: trendingFromClicks(listings, new Map()),
-    };
+  if (!hasSupabaseAdmin()) {
+    if (allowDemoBoard()) {
+      const listings = withRanks(DEMO_LISTINGS);
+      return {
+        listings,
+        stats: {
+          visitors: 0,
+          launched_at: new Date().toISOString(),
+        },
+        live: false,
+        activity: activityFromListings(listings),
+        trending: trendingFromClicks(listings, new Map(), true),
+      };
+    }
+    console.error("Supabase is not configured; returning an empty leaderboard.");
+    return emptyBoard;
   }
 
-  const db = supabaseAdmin();
+  const db = createSupabaseAdmin();
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const [{ data: listings, error }, { data: stats }, { data: recentClicks }] =
+  const [{ data: rows, error }, { data: stats }, { data: recentClicks }] =
     await Promise.all([
       db
         .from("listings")
         .select(
-          "id, listing_key, url, name, tagline, category, logo_url, bid_cents, clicks, created_at, last_bid_at",
+          "id, normalized_url, display_url, hostname, name, pitch, logo_url, current_bid_cents, click_count, created_at, updated_at",
         )
-        .order("bid_cents", { ascending: false })
-        .order("last_bid_at", { ascending: true }),
+        .order("current_bid_cents", { ascending: false })
+        .order("created_at", { ascending: true }),
       db.from("site_stats").select("visitors, launched_at").eq("id", 1).maybeSingle(),
       db.from("clicks").select("listing_id").gte("created_at", hourAgo),
     ]);
@@ -106,7 +146,7 @@ export async function getBoard(): Promise<{
     throw new Error(error.message);
   }
 
-  const ranked = withRanks((listings ?? []) as Listing[]);
+  const ranked = withRanks((rows ?? []).map((row) => mapListing(row as ListingRow)));
   const hourly = new Map<string, number>();
   for (const row of recentClicks ?? []) {
     const id = (row as { listing_id: string }).listing_id;
@@ -121,29 +161,31 @@ export async function getBoard(): Promise<{
     },
     live: true,
     activity: activityFromListings(ranked),
-    trending: trendingFromClicks(ranked, hourly),
+    trending: trendingFromClicks(ranked, hourly, false),
   };
 }
 
-export async function getListingById(id: string) {
-  if (!hasSupabase()) {
-    return DEMO_LISTINGS.find((l) => l.id === id) ?? null;
+export async function getAuthoritativeListings(): Promise<Listing[]> {
+  if (!hasSupabaseAdmin()) {
+    throw new Error("Supabase is not configured.");
   }
-  const { data, error } = await supabaseAdmin()
+  const { data, error } = await createSupabaseAdmin()
     .from("listings")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+    .select(
+      "id, normalized_url, display_url, hostname, name, pitch, logo_url, current_bid_cents, click_count, created_at, updated_at",
+    );
   if (error) throw new Error(error.message);
-  return (data as Listing | null) ?? null;
+  return (data ?? []).map((row) => mapListing(row as ListingRow));
 }
 
 export async function recordClick(id: string) {
-  if (!hasSupabase()) {
-    const listing = DEMO_LISTINGS.find((l) => l.id === id);
-    return listing?.url ?? null;
+  if (!hasSupabaseAdmin()) {
+    if (allowDemoBoard()) {
+      return DEMO_LISTINGS.find((l) => l.id === id)?.url ?? null;
+    }
+    return null;
   }
-  const { data, error } = await supabaseAdmin().rpc("record_click", {
+  const { data, error } = await createSupabaseAdmin().rpc("record_click", {
     p_listing_id: id,
   });
   if (error) throw new Error(error.message);
@@ -151,6 +193,6 @@ export async function recordClick(id: string) {
 }
 
 export async function bumpVisitor() {
-  if (!hasSupabase()) return;
-  await supabaseAdmin().rpc("bump_visitor");
+  if (!hasSupabaseAdmin()) return;
+  await createSupabaseAdmin().rpc("bump_visitor");
 }

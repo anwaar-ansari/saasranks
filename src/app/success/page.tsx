@@ -14,7 +14,7 @@ export default async function SuccessPage({
   searchParams: Promise<{ checkout_id?: string }>;
 }) {
   const { checkout_id } = await searchParams;
-  const { listings, stats } = await getBoard();
+  const { stats } = await getBoard();
 
   return (
     <>

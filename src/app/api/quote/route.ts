@@ -1,23 +1,27 @@
-import { getBoard } from "@/lib/board";
+import { getAuthoritativeListings, getBoard } from "@/lib/board";
 import { ListingUrlError, normalizeListingUrl } from "@/lib/listing-key";
 import { quoteBid, rankForBid } from "@/lib/rank";
+import { hasSupabaseAdmin } from "@/lib/supabase/env";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const amount = Number(searchParams.get("amount") ?? "0");
   const rawUrl = searchParams.get("url") ?? "";
+  const dollars = Number.isFinite(amount) ? Math.floor(amount) : 0;
 
-  const { listings } = await getBoard();
+  const listings = hasSupabaseAdmin()
+    ? await getAuthoritativeListings()
+    : (await getBoard()).listings;
 
   if (!rawUrl) {
     return Response.json({
-      rank: rankForBid(listings, Math.max(0, Math.floor(amount)) * 100),
+      rank: rankForBid(listings, Math.max(0, dollars) * 100),
     });
   }
 
   try {
     const { listingKey } = normalizeListingUrl(rawUrl);
-    const quote = quoteBid(listings, listingKey, Math.floor(amount));
+    const quote = quoteBid(listings, listingKey, dollars);
     if (!quote.ok) {
       return Response.json({ error: quote.error, rank: null });
     }

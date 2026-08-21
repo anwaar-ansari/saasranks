@@ -25,14 +25,13 @@ export function BidForm({ defaultAmount }: { defaultAmount: number }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/checkout", {
+      const res = await fetch("/api/bids/checkout", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           url,
           amount,
           tagline,
-          category: "other",
         }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
