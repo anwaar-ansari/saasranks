@@ -14,17 +14,17 @@ function claimDollars(listings: RankedListing[], listing: RankedListing) {
 }
 
 function rowTone(rank: number) {
-  if (rank === 1) return "border-blue/45 bg-[rgba(52,93,245,0.085)]";
-  if (rank === 2) return "border-blue/20 bg-[rgba(52,93,245,0.045)]";
-  if (rank === 3) return "border-transparent bg-[rgba(52,93,245,0.02)]";
+  if (rank === 1) return "border-blue/45 bg-[rgba(6,64,43,0.085)]";
+  if (rank === 2) return "border-blue/20 bg-[rgba(6,64,43,0.045)]";
+  if (rank === 3) return "border-transparent bg-[rgba(6,64,43,0.02)]";
   return "border-transparent bg-transparent";
 }
 
 function rankTone(rank: number) {
   if (rank === 1)
-    return "bg-blue text-white shadow-[0_3px_10px_-3px_rgba(52,93,245,0.85)]";
-  if (rank === 2) return "bg-[rgba(52,93,245,0.18)] text-blue-hi";
-  if (rank === 3) return "bg-[rgba(52,93,245,0.09)] text-blue-hi";
+    return "bg-blue text-white shadow-[0_3px_10px_-3px_rgba(6,64,43,0.85)]";
+  if (rank === 2) return "bg-[rgba(6,64,43,0.18)] text-blue-hi";
+  if (rank === 3) return "bg-[rgba(6,64,43,0.09)] text-blue-hi";
   return "text-faint";
 }
 
@@ -94,7 +94,7 @@ export function Leaderboard({ listings }: { listings: RankedListing[] }) {
               aria-current={i === page ? "page" : undefined}
               className={`num flex h-8 w-8 items-center justify-center rounded-full text-[13px] transition ${
                 i === page
-                  ? "bg-blue font-semibold text-white shadow-[0_3px_10px_-3px_rgba(52,93,245,0.85)]"
+                  ? "bg-blue font-semibold text-white shadow-[0_3px_10px_-3px_rgba(6,64,43,0.85)]"
                   : "text-dim hover:bg-blue-ghost hover:text-blue"
               }`}
               onClick={() => setPage(i)}
@@ -167,7 +167,7 @@ export function Leaderboard({ listings }: { listings: RankedListing[] }) {
                 <button
                   type="button"
                   aria-label={`Claim rank ${listing.rank} from ${listing.name} for $${claimFor}`}
-                  className="absolute -top-2.5 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-blue px-3 py-1 text-[12px] font-semibold text-white opacity-100 shadow-[0_4px_12px_-4px_rgba(52,93,245,0.9)] transition duration-150 hover:bg-blue-hi sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                  className="absolute -top-2.5 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-blue px-3 py-1 text-[12px] font-semibold text-white opacity-100 shadow-[0_4px_12px_-4px_rgba(6,64,43,0.9)] transition duration-150 hover:bg-blue-hi sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                   onClick={() => claim(listing)}
                 >
                   claim this rank for ${claimFor}

@@ -14,6 +14,20 @@ export type Listing = {
 
 export type RankedListing = Listing & { rank: number };
 
+export type ActivityEvent = {
+  id: string;
+  listingId: string;
+  name: string;
+  rank: number;
+  kind: "entered" | "reclaimed";
+  at: string;
+};
+
+export type TrendingItem = {
+  listing: RankedListing;
+  clicksPerHour: number;
+};
+
 export type SiteStats = {
   visitors: number;
   launched_at: string;

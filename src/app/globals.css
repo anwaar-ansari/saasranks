@@ -9,9 +9,9 @@
   --faint: #8b8c99;
   --line: #e4e5ec;
   --line-strong: #c9cad4;
-  --blue: #345df5;
-  --blue-hi: #1f4cf0;
-  --blue-ghost: rgba(52, 93, 245, 0.08);
+  --blue: #06402b;
+  --blue-hi: #042e1f;
+  --blue-ghost: rgba(6, 64, 43, 0.08);
   --green: #17a34a;
   --warn: #c2410c;
 }
@@ -48,7 +48,7 @@ body {
 }
 
 ::selection {
-  background: rgba(52, 93, 245, 0.18);
+  background: rgba(6, 64, 43, 0.18);
 }
 
 input,
@@ -90,7 +90,7 @@ textarea {
 }
 
 .shadow-glow {
-  box-shadow: 0 8px 24px -10px rgba(52, 93, 245, 0.65);
+  box-shadow: 0 8px 24px -10px rgba(6, 64, 43, 0.55);
 }
 
 .chip {
@@ -147,39 +147,3 @@ textarea {
   animation: fade-up 0.45s ease-out both;
 }
 
-.marquee {
-  overflow: hidden;
-}
-
-.marquee-track {
-  display: flex;
-  width: max-content;
-  animation: marquee 48s linear infinite;
-}
-
-.marquee-group {
-  display: flex;
-  align-items: center;
-}
-
-.marquee-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  font-size: 12.5px;
-  white-space: nowrap;
-}
-
-.marquee:hover .marquee-track {
-  animation-play-state: paused;
-}
-
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}

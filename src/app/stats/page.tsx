@@ -16,7 +16,7 @@ export default async function StatsPage() {
 
   return (
     <>
-      <SiteHeader listings={listings} visitors={stats.visitors} />
+      <SiteHeader visitors={stats.visitors} />
       <main className="mx-auto max-w-[720px] px-4 py-10 sm:px-6 sm:py-14">
         <Link href="/" className="text-[13px] font-medium text-blue hover:text-blue-hi">
           ← Back to the board

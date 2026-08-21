@@ -2,16 +2,9 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { formatCompact, formatUsd } from "@/lib/money";
-import type { RankedListing } from "@/lib/types";
+import { formatCompact } from "@/lib/money";
 
-export function SiteHeader({
-  listings,
-  visitors,
-}: {
-  listings: RankedListing[];
-  visitors: number;
-}) {
+export function SiteHeader({ visitors }: { visitors: number }) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -87,28 +80,6 @@ export function SiteHeader({
           Full stats ↗
         </Link>
       </div>
-      {listings.length > 0 ? (
-        <nav aria-label="Ranked products" className="marquee border-t border-line bg-panel/90">
-          <div className="marquee-track">
-            {[0, 1].map((copy) => (
-              <div key={copy} className="marquee-group" aria-hidden={copy === 1}>
-                {listings.slice(0, 15).map((listing) => (
-                  <a
-                    key={`${copy}-${listing.id}`}
-                    href={`/go/${listing.id}`}
-                    className="marquee-item transition hover:text-blue"
-                  >
-                    <span className="num text-blue">#{listing.rank}</span>
-                    <span className="font-semibold text-ink">{listing.name}</span>
-                    <span className="num text-blue-hi">{formatUsd(listing.bid_cents)}</span>
-                    <span className="text-faint/50">•</span>
-                  </a>
-                ))}
-              </div>
-            ))}
-          </div>
-        </nav>
-      ) : null}
     </header>
   );
 }

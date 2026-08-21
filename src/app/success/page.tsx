@@ -18,7 +18,7 @@ export default async function SuccessPage({
 
   return (
     <>
-      <SiteHeader listings={listings} visitors={stats.visitors} />
+      <SiteHeader visitors={stats.visitors} />
       <main className="mx-auto max-w-xl px-4 py-20 text-center">
         <p className="text-[13px] font-semibold text-blue">Paid</p>
         <h1 className="mt-3 text-[36px] font-semibold tracking-tight">You&apos;re on the board.</h1>
