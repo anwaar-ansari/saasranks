@@ -29,6 +29,15 @@ async function applyPaidOrder(order: {
     throw error;
   }
 
+  const result = data as { applied?: boolean; reason?: string } | null;
+  if (result && result.applied === false) {
+    console.warn("Polar order not applied", {
+      orderId: order.id,
+      checkoutId: order.checkoutId,
+      reason: result.reason,
+    });
+  }
+
   return data;
 }
 

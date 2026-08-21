@@ -43,7 +43,11 @@ export default async function RulesPage() {
             Taking #1 requires at least ${STEP_DOLLARS} more than the current top
             bid. Equal bids keep the older listing higher.
           </li>
-          <li>A checkout does not reserve a rank. The board can move before payment is confirmed.</li>
+          <li>
+            A checkout does not reserve a rank. Payment sets this product&apos;s
+            total bid to the amount you chose. Rank is computed afterward from
+            the live board (highest bid, then oldest listing).
+          </li>
         </ul>
 
         <h2 className="mt-10 text-[20px] font-semibold tracking-tight">What you can list</h2>

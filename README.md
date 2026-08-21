@@ -8,6 +8,7 @@ A public pay-to-rank leaderboard for SaaS products. Rank is the bid. Checkout is
 - To stand above another listing, bid at least **$1 more** than its current bid.
 - Equal bids keep the **older** listing higher (`current_bid_cents DESC`, `created_at ASC`).
 - Raising an existing URL charges only the **difference**.
+- Checkout buys a **target bid total**, not a reserved rank. One unpaid Polar session is allowed per SaaS URL.
 
 ## Setup
 

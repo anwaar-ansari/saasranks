@@ -81,3 +81,6 @@ export function quoteBid(
     existing: false,
   };
 }
+
+// `rank` is a preview only. Payment sets current_bid_cents to the frozen
+// target; live rank is computed later (bid DESC, created_at ASC).

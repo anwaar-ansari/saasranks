@@ -23,8 +23,10 @@ export default async function SuccessPage({
         <p className="text-[13px] font-semibold text-blue">Paid</p>
         <h1 className="mt-3 text-[36px] font-semibold tracking-tight">You&apos;re on the board.</h1>
         <p className="mt-3 text-[15px] text-dim">
-          Polar confirmed the payment. The listing appears as soon as the webhook
-          lands — usually a few seconds.
+          Polar confirmed the payment. That sets this product&apos;s bid to the
+          amount you paid toward — it does not reserve a rank. The listing
+          appears as soon as the webhook lands, then the live board orders by
+          bid, oldest listing first on ties.
         </p>
         {checkout_id ? (
           <p className="mt-3 font-mono text-[12px] text-faint">Checkout {checkout_id}</p>

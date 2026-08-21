@@ -1,10 +1,12 @@
 -- SaaSRanks production schema.
 -- Run this once in the Supabase SQL editor (Dashboard → SQL).
--- Replaces the earlier demo schema if it exists.
+-- Replaces earlier demo schemas if they exist.
 
 create extension if not exists pgcrypto;
 
 drop function if exists public.apply_paid_bid(uuid, text, integer);
+drop function if exists public.apply_paid_bid(text, text, integer);
+drop function if exists public.prepare_checkout_bid(text, text, text, text, text, text, integer, integer);
 drop function if exists public.record_click(uuid);
 drop function if exists public.bump_visitor();
 
@@ -45,13 +47,32 @@ create table public.bids (
   requested_target_bid_cents integer not null check (requested_target_bid_cents > 0),
   amount_due_cents integer not null check (amount_due_cents > 0),
   status text not null default 'pending'
-    check (status in ('pending', 'paid', 'processed', 'failed', 'expired')),
+    check (status in (
+      'pending',
+      'checkout_created',
+      'paid',
+      'processed',
+      'failed',
+      'expired',
+      'cancelled'
+    )),
   polar_checkout_id text unique,
+  polar_checkout_url text,
+  polar_checkout_expires_at timestamptz,
   polar_order_id text unique,
   webhook_processed_at timestamptz,
   created_at timestamptz not null default now(),
   paid_at timestamptz
 );
+
+-- At most one unpaid in-flight checkout per SaaS URL.
+create unique index bids_one_open_checkout_per_url
+  on public.bids (normalized_url)
+  where status in ('pending', 'checkout_created');
+
+create index bids_open_by_url_idx
+  on public.bids (normalized_url, created_at desc)
+  where status in ('pending', 'checkout_created');
 
 create index bids_status_idx on public.bids (status, created_at desc);
 create index bids_normalized_url_idx on public.bids (normalized_url);
@@ -87,8 +108,114 @@ create policy stats_public_read
   to anon, authenticated
   using (true);
 
--- Anonymous clients cannot insert/update listings, bids, or clicks.
--- All writes go through the service-role admin client / SECURITY DEFINER RPCs.
+-- A checkout buys a target bid total, not a reserved rank.
+-- Rank is always current_bid_cents DESC, created_at ASC after payment lands.
+
+create or replace function public.prepare_checkout_bid(
+  p_normalized_url text,
+  p_display_url text,
+  p_hostname text,
+  p_name text,
+  p_pitch text,
+  p_logo_url text,
+  p_target_cents integer,
+  p_amount_due_cents integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_active public.bids%rowtype;
+  v_new_id uuid;
+  v_previous_checkout text;
+begin
+  if p_normalized_url is null or p_target_cents is null or p_amount_due_cents is null then
+    raise exception 'invalid checkout request';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext(p_normalized_url));
+
+  update public.bids
+  set status = 'expired'
+  where normalized_url = p_normalized_url
+    and status in ('pending', 'checkout_created')
+    and (
+      (polar_checkout_expires_at is not null and polar_checkout_expires_at <= now())
+      or (
+        status = 'pending'
+        and polar_checkout_id is null
+        and created_at < now() - interval '5 minutes'
+      )
+    );
+
+  select * into v_active
+  from public.bids
+  where normalized_url = p_normalized_url
+    and status in ('pending', 'checkout_created')
+  for update;
+
+  if found then
+    if v_active.requested_target_bid_cents = p_target_cents
+       and v_active.amount_due_cents = p_amount_due_cents
+       and (
+         v_active.polar_checkout_expires_at is null
+         or v_active.polar_checkout_expires_at > now()
+       )
+    then
+      return jsonb_build_object(
+        'action', case
+          when v_active.polar_checkout_url is not null then 'reuse'
+          else 'attach'
+        end,
+        'bid_id', v_active.id,
+        'polar_checkout_id', v_active.polar_checkout_id,
+        'polar_checkout_url', v_active.polar_checkout_url,
+        'polar_checkout_expires_at', v_active.polar_checkout_expires_at
+      );
+    end if;
+
+    v_previous_checkout := v_active.polar_checkout_id;
+
+    update public.bids
+    set status = 'cancelled'
+    where id = v_active.id;
+  end if;
+
+  insert into public.bids (
+    normalized_url,
+    display_url,
+    hostname,
+    name,
+    pitch,
+    logo_url,
+    requested_target_bid_cents,
+    amount_due_cents,
+    status
+  )
+  values (
+    p_normalized_url,
+    p_display_url,
+    p_hostname,
+    coalesce(p_name, ''),
+    coalesce(p_pitch, ''),
+    p_logo_url,
+    p_target_cents,
+    p_amount_due_cents,
+    'pending'
+  )
+  returning id into v_new_id;
+
+  return jsonb_build_object(
+    'action', 'created',
+    'bid_id', v_new_id,
+    'polar_checkout_id', null,
+    'polar_checkout_url', null,
+    'previous_polar_checkout_id', v_previous_checkout
+  );
+end;
+$$;
 
 create or replace function public.apply_paid_bid(
   p_polar_checkout_id text,
@@ -130,11 +257,28 @@ begin
     return jsonb_build_object('applied', false, 'reason', 'already_processed');
   end if;
 
+  -- Do not apply cancelled/expired/failed rows. Those amounts must not
+  -- mutate the board. Polar metadata is never used as the bid target.
+  if v_bid.status not in ('pending', 'checkout_created', 'paid') then
+    return jsonb_build_object(
+      'applied', false,
+      'reason', 'bid_not_active',
+      'status', v_bid.status
+    );
+  end if;
+
+  -- Reconcile Polar subtotal against the server-stored amount due.
+  -- Never recompute amount_due from the live leaderboard here.
   if v_bid.amount_due_cents is distinct from p_paid_subtotal_cents then
     update public.bids
     set status = 'failed'
     where id = v_bid.id;
-    raise exception 'paid amount does not match amount due';
+    return jsonb_build_object(
+      'applied', false,
+      'reason', 'amount_mismatch',
+      'expected_cents', v_bid.amount_due_cents,
+      'paid_cents', p_paid_subtotal_cents
+    );
   end if;
 
   perform pg_advisory_xact_lock(hashtext(v_bid.normalized_url));
@@ -144,6 +288,7 @@ begin
   where normalized_url = v_bid.normalized_url
   for update;
 
+  -- Apply the frozen requested_target_bid_cents from this bid row.
   if not found then
     insert into public.listings (
       normalized_url,
@@ -199,7 +344,8 @@ begin
   return jsonb_build_object(
     'applied', true,
     'listing_id', v_listing_id,
-    'bid_id', v_bid.id
+    'bid_id', v_bid.id,
+    'target_bid_cents', v_bid.requested_target_bid_cents
   );
 end;
 $$;
@@ -248,10 +394,12 @@ begin
 end;
 $$;
 
+revoke all on function public.prepare_checkout_bid(text, text, text, text, text, text, integer, integer) from public, anon, authenticated;
 revoke all on function public.apply_paid_bid(text, text, integer) from public, anon, authenticated;
 revoke all on function public.record_click(uuid) from public, anon, authenticated;
 revoke all on function public.bump_visitor() from public, anon, authenticated;
 
+grant execute on function public.prepare_checkout_bid(text, text, text, text, text, text, integer, integer) to service_role;
 grant execute on function public.apply_paid_bid(text, text, integer) to service_role;
 grant execute on function public.record_click(uuid) to service_role;
 grant execute on function public.bump_visitor() to service_role;
