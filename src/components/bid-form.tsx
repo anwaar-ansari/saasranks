@@ -1,59 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { CATEGORIES } from "@/lib/categories";
-import { MIN_BID_DOLLARS, formatUsd } from "@/lib/money";
-import { minTakeTopCents } from "@/lib/rank";
-import type { RankedListing } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { MIN_BID_DOLLARS } from "@/lib/money";
 
-type Quote = {
-  rank: number | null;
-  pay?: number;
-  existing?: boolean;
-  error?: string;
-};
-
-export function BidForm({
-  listings,
-  defaultAmount,
-}: {
-  listings: RankedListing[];
-  defaultAmount: number;
-}) {
-  const topAsk = Math.ceil(minTakeTopCents(listings) / 100);
+export function BidForm({ defaultAmount }: { defaultAmount: number }) {
   const [amount, setAmount] = useState(defaultAmount);
   const [url, setUrl] = useState("");
   const [tagline, setTagline] = useState("");
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]["value"]>(
-    "other",
-  );
-  const [quote, setQuote] = useState<Quote>({ rank: 1 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      const params = new URLSearchParams({ amount: String(amount) });
-      if (url.trim()) params.set("url", url.trim());
-      const res = await fetch(`/api/quote?${params}`, { signal: controller.signal });
-      const data = (await res.json()) as Quote;
-      setQuote(data);
-    }, 250);
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [amount, url]);
-
-  const rankLabel = useMemo(() => {
-    if (quote.error && !quote.rank) return quote.error;
-    if (!quote.rank) return "Enter a bid to see rank";
-    if (quote.existing && quote.pay != null) {
-      return `Takes #${quote.rank} · you pay ${formatUsd(quote.pay * 100)} more`;
+    function onClaim(event: Event) {
+      const dollars = (event as CustomEvent<number>).detail;
+      if (typeof dollars === "number") setAmount(dollars);
+      document.getElementById("product-url")?.focus();
     }
-    return `Takes #${quote.rank}`;
-  }, [quote]);
+    window.addEventListener("saasranks:claim", onClaim);
+    return () => window.removeEventListener("saasranks:claim", onClaim);
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,13 +32,11 @@ export function BidForm({
           url,
           amount,
           tagline,
-          category,
+          category: "other",
         }),
       });
       const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
-        throw new Error(data.error ?? "Checkout failed.");
-      }
+      if (!res.ok || !data.url) throw new Error(data.error ?? "Checkout failed.");
       window.location.href = data.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");
@@ -82,103 +45,81 @@ export function BidForm({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-2xl border border-line bg-ink-2 p-5 sm:p-6"
-    >
-      <p className="text-xs uppercase tracking-[0.2em] text-cream-dim">
-        Claim a rank
-      </p>
-      <div className="mt-4 flex items-end justify-between gap-4">
-        <label className="block">
-          <span className="text-sm text-cream-dim">Bid (USD)</span>
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              className="grid h-11 w-11 place-items-center rounded-xl border border-line text-lg hover:border-cream/40"
-              onClick={() => setAmount((n) => Math.max(MIN_BID_DOLLARS, n - 1))}
-              aria-label="Decrease bid"
-            >
-              −
-            </button>
-            <input
-              className="h-11 w-28 rounded-xl border border-line bg-ink px-3 text-center text-lg tabular outline-none focus:border-lime"
-              inputMode="numeric"
-              value={amount}
-              onChange={(e) => {
-                const next = Number(e.target.value.replace(/[^\d]/g, ""));
-                setAmount(Number.isFinite(next) ? next : MIN_BID_DOLLARS);
-              }}
-            />
-            <button
-              type="button"
-              className="grid h-11 w-11 place-items-center rounded-xl border border-line text-lg hover:border-cream/40"
-              onClick={() => setAmount((n) => n + 1)}
-              aria-label="Increase bid"
-            >
-              +
-            </button>
-          </div>
-        </label>
-        <p className="max-w-[14rem] text-right text-sm text-lime">{rankLabel}</p>
-      </div>
-
-      <label className="mt-5 block">
-        <span className="text-sm text-cream-dim">Product URL</span>
+    <form id="bid" onSubmit={onSubmit} className="panel shadow-panel p-3">
+      <label className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-raise px-3.5 py-3 focus-within:border-blue">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+          className="h-4 w-4 shrink-0 text-faint"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3.3 9.2h17.4M3.3 14.8h17.4" />
+          <path d="M12 3c2.3 2.4 3.5 5.4 3.5 9s-1.2 6.6-3.5 9c-2.3-2.4-3.5-5.4-3.5-9S9.7 5.4 12 3Z" />
+        </svg>
         <input
-          className="mt-2 h-11 w-full rounded-xl border border-line bg-ink px-3 outline-none placeholder:text-cream-dim/50 focus:border-lime"
-          placeholder="linear.app"
+          id="product-url"
+          placeholder="yourproduct.com"
+          aria-label="Your product URL"
+          className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-faint"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           required
         />
       </label>
-
-      <label className="mt-4 block">
-        <span className="text-sm text-cream-dim">One-line pitch</span>
+      <label className="mt-3 flex min-w-0 items-center rounded-xl border border-line bg-raise px-3.5 py-3 focus-within:border-blue">
         <input
-          className="mt-2 h-11 w-full rounded-xl border border-line bg-ink px-3 outline-none placeholder:text-cream-dim/50 focus:border-lime"
-          placeholder="Issue tracking your team actually likes"
+          placeholder="One-line pitch (optional)"
+          aria-label="One-line pitch"
+          className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-faint"
           value={tagline}
           onChange={(e) => setTagline(e.target.value)}
           maxLength={160}
         />
       </label>
-
-      <label className="mt-4 block">
-        <span className="text-sm text-cream-dim">Category</span>
-        <select
-          className="mt-2 h-11 w-full rounded-xl border border-line bg-ink px-3 outline-none focus:border-lime"
-          value={category}
-          onChange={(e) =>
-            setCategory(e.target.value as (typeof CATEGORIES)[number]["value"])
-          }
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          aria-label="Decrease bid by 1"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line bg-raise text-xl text-dim transition hover:border-line-strong hover:text-ink active:scale-[0.95]"
+          onClick={() => setAmount((n) => Math.max(MIN_BID_DOLLARS, n - 1))}
         >
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </label>
-
+          −
+        </button>
+        <input
+          inputMode="numeric"
+          aria-label="Bid amount in US dollars"
+          className="num h-16 min-w-0 flex-1 bg-transparent text-center text-[32px] font-semibold tracking-tight outline-none"
+          value={`$${amount}`}
+          onChange={(e) => {
+            const next = Number(e.target.value.replace(/[^\d]/g, ""));
+            setAmount(Number.isFinite(next) ? next : MIN_BID_DOLLARS);
+          }}
+        />
+        <button
+          type="button"
+          aria-label="Increase bid by 1"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line bg-raise text-xl text-dim transition hover:border-line-strong hover:text-ink active:scale-[0.95]"
+          onClick={() => setAmount((n) => n + 1)}
+        >
+          +
+        </button>
+      </div>
       {error ? (
-        <p className="mt-4 text-sm text-warn" role="alert">
+        <p className="mt-3 text-[13px] text-warn" role="alert">
           {error}
         </p>
-      ) : (
-        <p className="mt-4 text-sm text-cream-dim">
-          New spots start at ${MIN_BID_DOLLARS}. Taking #1 costs ${topAsk} right
-          now. Same URL again raises your listing — you only pay the difference.
-        </p>
-      )}
-
+      ) : null}
       <button
         type="submit"
         disabled={busy}
-        className="mt-5 h-12 w-full rounded-xl bg-lime font-medium text-lime-ink transition hover:brightness-95 disabled:opacity-60"
+        className="mt-3 w-full rounded-xl bg-blue px-5 py-3 text-[14px] font-semibold tracking-tight text-white shadow-glow transition hover:bg-blue-hi active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
       >
-        {busy ? "Opening Polar…" : "Place bid"}
+        {busy ? "Opening Polar…" : "Bid"}
       </button>
     </form>
   );

@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { SiteHeader } from "@/components/site-header";
+import { getBoard } from "@/lib/board";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Bid received · SaaSRanks",
+  title: "Bid received — saasranks",
 };
 
 export default async function SuccessPage({
@@ -10,26 +14,28 @@ export default async function SuccessPage({
   searchParams: Promise<{ checkout_id?: string }>;
 }) {
   const { checkout_id } = await searchParams;
+  const { listings, stats } = await getBoard();
 
   return (
-    <main className="mx-auto max-w-xl px-5 py-20 text-center">
-      <p className="text-xs uppercase tracking-[0.22em] text-lime">Paid</p>
-      <h1 className="mt-4 font-serif text-5xl tracking-tight">You’re on the board.</h1>
-      <p className="mt-4 text-cream-dim">
-        Polar confirmed the payment. The listing appears as soon as the webhook
-        lands — usually a few seconds.
-      </p>
-      {checkout_id ? (
-        <p className="mt-3 font-mono text-xs text-cream-dim">
-          Checkout {checkout_id}
+    <>
+      <SiteHeader listings={listings} visitors={stats.visitors} />
+      <main className="mx-auto max-w-xl px-4 py-20 text-center">
+        <p className="text-[13px] font-semibold text-blue">Paid</p>
+        <h1 className="mt-3 text-[36px] font-semibold tracking-tight">You&apos;re on the board.</h1>
+        <p className="mt-3 text-[15px] text-dim">
+          Polar confirmed the payment. The listing appears as soon as the webhook
+          lands — usually a few seconds.
         </p>
-      ) : null}
-      <Link
-        href="/"
-        className="mt-8 inline-flex h-12 items-center rounded-xl bg-lime px-5 font-medium text-lime-ink"
-      >
-        Back to the board
-      </Link>
-    </main>
+        {checkout_id ? (
+          <p className="mt-3 font-mono text-[12px] text-faint">Checkout {checkout_id}</p>
+        ) : null}
+        <Link
+          href="/"
+          className="mt-8 inline-flex rounded-xl bg-blue px-5 py-3 text-[14px] font-semibold text-white shadow-glow hover:bg-blue-hi"
+        >
+          Back to the board
+        </Link>
+      </main>
+    </>
   );
 }

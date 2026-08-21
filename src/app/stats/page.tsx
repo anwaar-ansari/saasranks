@@ -1,10 +1,12 @@
+import Link from "next/link";
+import { SiteHeader } from "@/components/site-header";
 import { getBoard } from "@/lib/board";
 import { formatCompact, formatUsd } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Stats · SaaSRanks",
+  title: "Stats — saasranks",
 };
 
 export default async function StatsPage() {
@@ -13,28 +15,31 @@ export default async function StatsPage() {
   const clicks = listings.reduce((sum, l) => sum + l.clicks, 0);
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-14">
-      <p className="text-xs uppercase tracking-[0.22em] text-cream-dim">Stats</p>
-      <h1 className="mt-3 font-serif text-5xl tracking-tight">The board, counted.</h1>
-      <p className="mt-4 text-cream-dim">
-        {live
-          ? "Live totals from Supabase."
-          : "Demo totals until Supabase is connected."}
-      </p>
-
-      <dl className="mt-10 grid gap-4 sm:grid-cols-2">
-        {[
-          { label: "Visitors", value: formatCompact(stats.visitors) },
-          { label: "Listings", value: formatCompact(listings.length) },
-          { label: "Bid volume on the board", value: formatUsd(volume) },
-          { label: "Tracked clicks", value: formatCompact(clicks) },
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl border border-line bg-ink-2 p-5">
-            <dt className="text-sm text-cream-dim">{item.label}</dt>
-            <dd className="mt-2 font-serif text-4xl tabular">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </main>
+    <>
+      <SiteHeader listings={listings} visitors={stats.visitors} />
+      <main className="mx-auto max-w-[720px] px-4 py-10 sm:px-6 sm:py-14">
+        <Link href="/" className="text-[13px] font-medium text-blue hover:text-blue-hi">
+          ← Back to the board
+        </Link>
+        <p className="mt-8 text-[13px] text-faint">Stats — saasranks</p>
+        <h1 className="mt-2 text-[36px] font-semibold tracking-tight">Stats</h1>
+        <p className="mt-3 text-[15px] text-dim">
+          {live ? "Live totals from Supabase." : "Demo totals until Supabase is connected."}
+        </p>
+        <dl className="mt-8 grid gap-3 sm:grid-cols-2">
+          {[
+            { label: "Visitors", value: formatCompact(stats.visitors) },
+            { label: "Listings", value: formatCompact(listings.length) },
+            { label: "Bid volume", value: formatUsd(volume) },
+            { label: "Tracked clicks", value: formatCompact(clicks) },
+          ].map((item) => (
+            <div key={item.label} className="panel shadow-panel p-5">
+              <dt className="text-[13px] text-dim">{item.label}</dt>
+              <dd className="num mt-2 text-[32px] font-semibold tracking-tight">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </main>
+    </>
   );
 }
