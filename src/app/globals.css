@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #13110e;
+  --ink-2: #1c1914;
+  --cream: #f4eee2;
+  --cream-dim: #c9c0b0;
+  --line: rgba(244, 238, 226, 0.12);
+  --lime: #d4ff3e;
+  --lime-ink: #14180a;
+  --warn: #ffb020;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-cream: var(--cream);
+  --color-cream-dim: var(--cream-dim);
+  --color-line: var(--line);
+  --color-lime: var(--lime);
+  --color-lime-ink: var(--lime-ink);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-instrument);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: var(--line);
+}
+
+html,
+body {
+  background: var(--ink);
+  color: var(--cream);
+}
+
+body {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--lime);
+  color: var(--lime-ink);
+}
+
+input,
+select,
+button,
+textarea {
+  font: inherit;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
